@@ -33,6 +33,8 @@ Object.assign(defaultStatus, {
   condition: "initial",
 })
 
+const UNLOCKED_LICENSE_KEY = "UNLOCKED-FULL-ACCESS";
+
 export const LicenseModule: Module<State, RootState>  = {
   namespaced: true,
   state: () => ({
@@ -141,6 +143,9 @@ export const LicenseModule: Module<State, RootState>  = {
       await context.dispatch('sync')
     },
     async update(_context, license: TransportLicenseKey) {
+      if (license.key === UNLOCKED_LICENSE_KEY) {
+        return;
+      }
       if (license.id == null) {
         // Saving a license without an id would INSERT a new row. The only
         // legitimate no-id path is add(); update() should only ever see
@@ -202,6 +207,9 @@ export const LicenseModule: Module<State, RootState>  = {
       }
     },
     async updateAll(context) {
+      if (context.state.status?.license?.key === UNLOCKED_LICENSE_KEY) {
+        return;
+      }
       if (inflightUpdateAll) return inflightUpdateAll
 
       const work = (async () => {
