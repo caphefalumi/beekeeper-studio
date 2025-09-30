@@ -1,9 +1,53 @@
-import { OfflineLicense } from "@/backend/lib/OfflineLicense";
-import { ConnectionState } from "@/common/appdb/Connection";
-import { LicenseKey } from "@/common/appdb/models/LicenseKey";
 import { TransportLicenseKey } from "@/common/transport";
 import { LicenseStatus } from "@/lib/license";
 import { InstallationId } from "@/common/appdb/models/installation_id";
+
+const UNLOCKED_LICENSE_KEY = "UNLOCKED-FULL-ACCESS";
+
+function farFutureDate() {
+  return new Date("2999-12-31T23:59:59.999Z");
+}
+
+function createUnlockedLicense(): TransportLicenseKey {
+  const now = new Date();
+  const forever = farFutureDate();
+  return {
+    id: 0,
+    createdAt: now,
+    updatedAt: now,
+    version: 1,
+    email: "dangduytoan13l@gmail.com",
+    key: UNLOCKED_LICENSE_KEY,
+    validUntil: forever,
+    supportUntil: forever,
+    licenseType: "PersonalLicense",
+    active: true,
+    maxAllowedAppRelease: { tagName: "v9999.0.0" },
+  };
+}
+
+function createUnlockedStatus(): LicenseStatus {
+  const status = new LicenseStatus();
+  status.edition = "ultimate";
+  status.condition = [];
+  status.license = createUnlockedLicense();
+
+  return {
+    ...status,
+    // Ensure the serialized object still exposes the computed helpers the
+    // renderer expects (electron will drop the class prototype/getters).
+    isUltimate: status.isUltimate,
+    isCommunity: status.isCommunity,
+    isTrial: status.isTrial,
+    isValidDateExpired: status.isValidDateExpired,
+    isSupportDateExpired: status.isSupportDateExpired,
+    maxAllowedVersion: status.maxAllowedVersion,
+  } as LicenseStatus;
+}
+
+export function isUnlockedLicense(license: TransportLicenseKey | undefined | null) {
+  return license?.key === UNLOCKED_LICENSE_KEY;
+}
 
 export interface ILicenseHandlers {
   "license/createTrialLicense": () => Promise<void>;
@@ -16,44 +60,19 @@ export interface ILicenseHandlers {
 
 export const LicenseHandlers: ILicenseHandlers = {
   "license/createTrialLicense": async function () {
-    await LicenseKey.createTrialLicense();
+    return;
   },
-  "license/remove": async function({ id }){
-    const key = await LicenseKey.findOneBy({ id })
-    if (key) {
-      await key.remove()
-    }
+  "license/remove": async function() {
+    return;
   },
   "license/getStatus": async function () {
-    // If someone has a file-based license, that takes
-    // priority over ALL other licenses
-    const offline = OfflineLicense.load()
-    let status = null
-    if (offline && offline.isValid) {
-      status = offline.toLicenseStatus()
-    } else {
-      status = await LicenseKey.getLicenseStatus();
-    }
-    return {
-      ...status,
-      isUltimate: status.isUltimate,
-      isCommunity: status.isCommunity,
-      isTrial: status.isTrial,
-      isValidDateExpired: status.isValidDateExpired,
-      isSupportDateExpired: status.isSupportDateExpired,
-      maxAllowedVersion: status.maxAllowedVersion,
-    };
+    return createUnlockedStatus();
   },
   "license/get": async function () {
-    const offline = OfflineLicense.load()
-    if (offline) {
-      const licenseKey = offline.toLicenseKey();
-      if (licenseKey) return [licenseKey];
-    }
-    return await LicenseKey.find();
+    return [createUnlockedLicense()];
   },
   "license/wipe": async function() {
-    await LicenseKey.wipe();
+    return;
   },
   "license/getInstallationId": async function() {
     // Make sure we return a string, not null
