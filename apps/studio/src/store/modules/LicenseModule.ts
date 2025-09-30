@@ -29,6 +29,8 @@ Object.assign(defaultStatus, {
   condition: "initial",
 })
 
+const UNLOCKED_LICENSE_KEY = "UNLOCKED-FULL-ACCESS";
+
 export const LicenseModule: Module<State, RootState>  = {
   namespaced: true,
   state: () => ({
@@ -139,6 +141,9 @@ export const LicenseModule: Module<State, RootState>  = {
       await context.dispatch('sync')
     },
     async update(_context, license: TransportLicenseKey) {
+      if (license.key === UNLOCKED_LICENSE_KEY) {
+        return;
+      }
       // This is to allow for dev switching
       const isDevUpdate = window.platformInfo.isDevelopment && license.email == "fake_email";
       try {
@@ -170,6 +175,9 @@ export const LicenseModule: Module<State, RootState>  = {
       }
     },
     async updateAll(context) {
+      if (context.state.status?.license?.key === UNLOCKED_LICENSE_KEY) {
+        return;
+      }
       for (let index = 0; index < context.getters.realLicenses.length; index++) {
         const license = context.getters.realLicenses[index];
         await context.dispatch('update', license);
