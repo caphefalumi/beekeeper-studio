@@ -1,6 +1,7 @@
 name: Studio - Build [non production]
 
 on:
+  workflow_dispatch: 
   pull_request:
     paths-ignore:
       - apps/sqltools/**
