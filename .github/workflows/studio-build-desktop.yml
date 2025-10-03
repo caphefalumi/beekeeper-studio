@@ -1,0 +1,92 @@
+name: Studio - Build Desktop (manual)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop-build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [macos-14, windows-2022]
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install python 3.11 (mac)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install python@3.11
+          echo "/opt/homebrew/opt/python@3.11/libexec/bin" >> $GITHUB_PATH
+          export PATH="/opt/homebrew/opt/python@3.11/libexec/bin:$PATH"
+          export PYTHON_PATH="/opt/homebrew/opt/python@3.11/libexec/bin/python3"
+
+      - name: Install python 3.11 (windows)
+        if: startsWith(matrix.os, 'windows')
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Verify Python Version (windows)
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          $PYTHON_VERSION = python --version | Out-String
+          Write-Output "Installed Python version: $PYTHON_VERSION"
+          if (-not $PYTHON_VERSION.StartsWith("Python 3.11")) {
+            Write-Output "Error: Python version does not start with 3.11"
+            exit 1
+          }
+        shell: powershell
+
+      - name: Verify Python Version (mac)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          PYTHON_VERSION=$(python3 --version | cut -d " " -f 2)
+          echo "Installed Python version: $PYTHON_VERSION"
+          if [[ ! $PYTHON_VERSION == 3.11* ]]; then
+            echo "Error: Python version does not start with 3.11"
+            exit 1
+          fi
+
+      - name: Install Node.js, NPM and Yarn
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: yarn
+
+      - name: Clean cache
+        run: yarn cache clean
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --network-timeout 100000
+        env:
+          npm_config_node_gyp: ${{ github.workspace }}${{ runner.os == 'Windows' && '\\node_modules\\node-gyp\\bin\\node-gyp.js' || '/node_modules/node-gyp/bin/node-gyp.js' }}
+
+      - name: Build Electron app
+        run: yarn run electron:build --publish never
+        env:
+          PYTHON_PATH: ${{ startsWith(matrix.os, 'macos') && '/opt/homebrew/opt/python@3.11/libexec/bin/python3' || '$PYTHON_PATH' }}
+          PYTHONPATH: ${{ startsWith(matrix.os, 'macos') && '/opt/homebrew/opt/python@3.11/libexec/bin/python3' || '$PYTHONPATH' }}
+
+      - name: Cleanup artifacts (mac)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          npx rimraf "apps/studio/dist_electron/!(*.dmg)"
+
+      - name: Cleanup artifacts (windows)
+        if: startsWith(matrix.os, 'windows')
+        continue-on-error: true
+        run: |
+          npx rimraf "apps\\studio\\dist_electron\\!(*.exe)"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}
+          path: apps/studio/dist_electron
