@@ -2,6 +2,10 @@ name: Studio - Build Desktop (manual)
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to set in apps/studio/package.json (e.g. 5.4.10)'
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -57,6 +61,13 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: yarn
+
+      - name: Set app version from input
+        if: ${{ github.event.inputs.version != '' }}
+        run: |
+          node -e "const fs=require('fs'); const path='apps/studio/package.json'; const p=JSON.parse(fs.readFileSync(path)); p.version=process.env.INPUT_VERSION; fs.writeFileSync(path, JSON.stringify(p,null,2)+'\n'); console.log('Updated', path, 'to', process.env.INPUT_VERSION);"
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
 
       - name: Clean cache
         run: yarn cache clean
